@@ -502,7 +502,7 @@ class MMapIndexedDatasetBuilder(object):
     def add_item(self, tensor):
         np_array = np.array(tensor.numpy(), dtype=self._dtype)
         self._data_file.write(np_array.tobytes(order='C'))
-        self._sizes.append(np_array.size)
+        self._sizes.append(np_array.size)  # sent lengths
 
     def merge_file_(self, another_file):
         # Concatenate index

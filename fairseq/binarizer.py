@@ -22,6 +22,16 @@ def safe_readline(f):
 
 class Binarizer:
     @staticmethod
+
+    # filename=data-bin/wikitext-2/raw_data/wikitext-2/wiki.train.tokens
+    # dict=vocab=src_dic
+    # consumer= lambda t: ds.add_item(t),  # ds will write to the binary file train.bin (add_item)
+    #def tokenize_line(line):
+    #line = SPACE_NORMALIZER.sub(" ", line)
+    #line = line.strip()
+    #return line.split()
+    # offset=0
+    # end=offsets[1]=0
     def binarize(
         filename,
         dict,
@@ -60,13 +70,22 @@ class Binarizer:
                         line=line,
                         line_tokenizer=tokenize,
                         add_if_not_exist=False,
-                        consumer=replaced_consumer,
-                        append_eos=append_eos,
+                        consumer=replaced_consumer,  # Counter above
+                        append_eos=append_eos,  # The only addition: append </s>
                         reverse_order=reverse_order,
                     )
+                    #print('line:', line)  # "The series has also been criticized for its release model in contrast to ... on which songs could be made forward @-@ compatible ."
+                    #print('tokenize:', tokenize)  # <function tokenize_line at 0x7f39137d90e0>
+                    #print('append_eos:', append_eos)  # True
+                    #print('reverse_order:', reverse_order)  # False
+
+                    # print('ids:', ids)  # int32 tensor([   15,   109,    52,    46,    53,  1760,    21...])
+                    # ids have varying lengths (2, 87, 328) for different lines
+                    # print(' '.join([dict.symbols[id] for id in ids]))  # The series has also been criticized for its release model in contrast ... on which songs could be made forward @-@ compatible . </s>
+
                 nseq += 1
                 ntok += len(ids)
-                consumer(ids)
+                consumer(ids)  # This writes to train.bin
                 line = f.readline()
         return {
             "nseq": nseq,

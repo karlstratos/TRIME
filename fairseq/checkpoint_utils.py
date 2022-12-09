@@ -149,7 +149,7 @@ def load_checkpoint(args, trainer, **passthrough_args):
         )
         epoch_itr.load_state_dict(itr_state)
     else:
-        epoch_itr = trainer.get_train_iterator(
+        epoch_itr = trainer.get_train_iterator(    # EpochBatchIterator over TokenBlockDataset(train)
             epoch=0, load_dataset=True, **passthrough_args
         )
 

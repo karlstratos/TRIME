@@ -266,7 +266,7 @@ class Dictionary(object):
         append_eos=True,
         reverse_order=False,
     ):
-        words = line_tokenizer(line)
+        words = line_tokenizer(line)  # ['The', 'series', 'has', 'also', 'been', ...]
         if reverse_order:
             words = list(reversed(words))
         nwords = len(words)
@@ -277,11 +277,11 @@ class Dictionary(object):
                 idx = self.add_symbol(word)
             else:
                 idx = self.index(word)
-            if consumer is not None:
+            if consumer is not None:  # This is just a counter updating counts
                 consumer(word, idx)
             ids[i] = idx
         if append_eos:
-            ids[nwords] = self.eos_index
+            ids[nwords] = self.eos_index  # [...'</s>']
         return ids
 
     @staticmethod

@@ -308,6 +308,9 @@ def add_dataset_args(parser, train=False, gen=False):
     group.add_argument('--mem-size', default=0, type=int, help='size of the long-term memory')
     group.add_argument('--use-faiss-cpu', action='store_true', help='use faiss-cpu, do not load index on GPUs')
     group.add_argument('--output-segments-to-file', default=None, type=str, help='if a path, only output segments to that path')
+    group.add_argument('--data_debug', type=str, default=None,
+                       help='write batches for debugging')
+
 
     if train:
         group.add_argument('--train-subset', default='train', metavar='SPLIT',
@@ -413,6 +416,8 @@ def add_optimization_args(parser):
     group.add_argument('--keep-order', action='store_true', help='whether to keep the original order of the dataset (used for TrimeLM_long)')
     group.add_argument('--num-comb-shards', default=1, type=int)
     group.add_argument('--train-mem-size', default=None, type=int)
+    group.add_argument('--skip-training', action='store_true')
+
     # fmt: on
     return group
 

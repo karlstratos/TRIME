@@ -242,15 +242,15 @@ class Trainer(object):
         shard_batch_itr=True,
     ):
         """Return an EpochBatchIterator over the training set for a given epoch."""
-        if load_dataset:
+        if load_dataset:  # True
             logger.info("loading train data for epoch {}".format(epoch))
-            self.task.load_dataset(
+            self.task.load_dataset(  # TokenBlockDataset
                 self.args.train_subset,
                 epoch=epoch,
                 combine=combine,
                 data_selector=data_selector,
             )
-        return self.task.get_batch_iterator(
+        return self.task.get_batch_iterator(  # EpochBatchIterator
             dataset=self.task.dataset(self.args.train_subset),
             max_tokens=self.args.max_tokens,
             max_sentences=self.args.max_sentences,
@@ -354,7 +354,7 @@ class Trainer(object):
             return None
 
         try:
-            # normalize grads by sample size
+            # normalize grads by sample size (loss never normalized)
             if sample_size > 0:
                 if self._sync_stats():
                     # multiply gradients by (# GPUs / sample_size) since DDP

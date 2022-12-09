@@ -121,6 +121,8 @@ class TransformerLanguageModel(FairseqLanguageModel):
     def build_model(cls, args, task):
         """Build a new model instance."""
 
+        #args.decoder_input_dim=410
+
         # make sure all arguments are present in older models
         base_lm_architecture(args)
 
@@ -136,16 +138,19 @@ class TransformerLanguageModel(FairseqLanguageModel):
                 args.character_embedding_dim, args.decoder_embed_dim,
                 args.char_embedder_highway_layers,
             )
-        elif args.adaptive_input:
+        elif args.adaptive_input:  # This
             embed_tokens = AdaptiveInput(
-                len(task.source_dictionary), task.source_dictionary.pad(), args.decoder_input_dim,
-                args.adaptive_input_factor, args.decoder_embed_dim,
-                options.eval_str_list(args.adaptive_input_cutoff, type=int),
+                len(task.source_dictionary),  # 33280  (wiki-2)
+                task.source_dictionary.pad(),  # 1
+                args.decoder_input_dim,  # 410, set in register_model_architecture: transformer_lm_wiki103_150m
+                args.adaptive_input_factor,  # 1.0
+                args.decoder_embed_dim,  # 410
+                options.eval_str_list(args.adaptive_input_cutoff, type=int),  # [2000, 6000]
             )
         else:
             embed_tokens = Embedding(len(task.source_dictionary), args.decoder_input_dim, task.source_dictionary.pad())
 
-        if args.tie_adaptive_weights:
+        if args.tie_adaptive_weights:  # True
             assert args.adaptive_input
             assert args.adaptive_input_factor == args.adaptive_softmax_factor
             assert args.adaptive_softmax_cutoff == args.adaptive_input_cutoff, '{} != {}'.format(
@@ -270,7 +275,7 @@ def transformer_lm_wiki103_small_sm(args):
 @register_model_architecture('transformer_lm', 'transformer_lm_wiki103_150M')
 def transformer_lm_wiki103_150m(args):
     args.decoder_layers = getattr(args, 'decoder_layers', 16)
-    args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 410)
+    args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 410)  # This is where dimensions/etc. are set
     args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 2100)
     args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 10)
     args.dropout = getattr(args, 'dropout', 0.3)

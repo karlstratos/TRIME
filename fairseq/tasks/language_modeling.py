@@ -199,11 +199,11 @@ class LanguageModelingTask(FairseqTask):
             dataset = TruncateDataset(dataset, self.args.tokens_per_sample)
 
         dataset = TokenBlockDataset(
-            dataset,
-            dataset.sizes,
-            self.args.tokens_per_sample,
-            pad=self.dictionary.pad(),
-            eos=self.dictionary.eos(),
+            dataset,  # MMapIndexedDataset
+            dataset.sizes,  # [1 5 1 ... 9 1 1]
+            self.args.tokens_per_sample,  # 150
+            pad=self.dictionary.pad(),  # 1
+            eos=self.dictionary.eos(),  # 2
             break_mode= "none" if split == "train" else self.args.sample_break_mode,
             include_targets=True,
         )

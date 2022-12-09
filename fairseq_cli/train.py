@@ -36,7 +36,6 @@ logger = logging.getLogger('fairseq_cli.train')
 
 def main(args, init_distributed=False):
     utils.import_user_module(args)
-
     assert args.max_tokens is not None or args.max_sentences is not None, \
         'Must specify batch size either with --max-tokens or --max-sentences'
 
@@ -51,7 +50,6 @@ def main(args, init_distributed=False):
     if distributed_utils.is_master(args):
         checkpoint_utils.verify_checkpoint_directory(args.save_dir)
 
-    # Print args
     logger.info(args)
 
     bsz_per_gpu = args.max_tokens // args.tokens_per_sample
@@ -81,7 +79,7 @@ def main(args, init_distributed=False):
 
     # Load valid dataset (we load training data below, based on the latest checkpoint)
     for valid_sub_split in args.valid_subset.split(','):
-        task.load_dataset(valid_sub_split, combine=False, epoch=0)
+        task.load_dataset(valid_sub_split, combine=False, epoch=0)  # self.datasets['valid'] = MonolingualDataset(...)
 
     # Build model and criterion
     model = task.build_model(args)
@@ -97,13 +95,14 @@ def main(args, init_distributed=False):
     trainer = Trainer(args, task, model, criterion)
     logger.info('training on {} GPUs'.format(args.distributed_world_size))
     logger.info('max tokens per GPU = {} and max sentences per GPU = {}'.format(
-        args.max_tokens,
-        args.max_sentences,
+        args.max_tokens,  # 9000
+        args.max_sentences,  # None
     ))
 
     # Load the latest checkpoint if one is available and restore the
     # corresponding train iterator
     extra_state, epoch_itr = checkpoint_utils.load_checkpoint(args, trainer)
+    # epoch_itr:  EpochBatchIterator over TokenBlockDataset(train)
 
     if args.output_segments_to_file is not None:
         segments = []
@@ -118,6 +117,32 @@ def main(args, init_distributed=False):
             json.dump(segments, f)
         exit(0)
 
+    if args.data_debug is not None:
+        # Doing exactly what training does, only turn shuffle off
+        import pickle
+        itr = epoch_itr.next_epoch_itr(shuffle=False)
+        update_freq = (    # update_freq=2: args.update_freq=[2], epoch_itr.epoch=1
+            args.update_freq[epoch_itr.epoch - 1]
+            if epoch_itr.epoch <= len(args.update_freq)
+            else args.update_freq[-1]
+        )
+        itr = iterators.GroupedIterator(itr, update_freq)
+        progress = progress_bar.build_progress_bar(
+            args, itr, epoch_itr.epoch, no_progress_bar='simple',
+        )
+        task.begin_epoch(epoch_itr.epoch, trainer.get_model())
+        batches = list(progress)
+        data = (len(batches), batches[0], batches[-1])
+
+        with open(args.data_debug, 'wb') as f:
+            pickle.dump(data, f)
+
+        print(data[0], 'batches')
+        print('First batch')
+        print(data[1])
+        print('Last batch')
+        print(data[2])
+        exit()
 
     # Train until the learning rate gets too small
     max_epoch = args.max_epoch or math.inf
@@ -127,16 +152,17 @@ def main(args, init_distributed=False):
     train_meter.start()
     valid_subsets = args.valid_subset.split(',')
     while (
-        lr > args.min_lr
-        and (
-            epoch_itr.epoch < max_epoch
-            # allow resuming training from the final checkpoint
+            lr > args.min_lr  # lr=1e-07, min_lr=-1
+            and (
+                epoch_itr.epoch < max_epoch
+                # allow resuming training from the final checkpoint
             or epoch_itr._next_epoch_itr is not None
-        )
-        and trainer.get_num_updates() < max_update
+            )
+            and trainer.get_num_updates() < max_update
     ):
         # train for one epoch
-        train(args, trainer, task, epoch_itr)
+        if not args.skip_training:
+            train(args, trainer, task, epoch_itr)
 
         if not args.disable_validation and epoch_itr.epoch % args.validate_interval == 0:
             valid_losses = validate(args, trainer, task, epoch_itr, valid_subsets)
@@ -186,7 +212,7 @@ def should_stop_early(args, valid_loss):
 def train(args, trainer, task, epoch_itr):
     """Train the model for one epoch."""
     # Initialize data iterator
-    itr = epoch_itr.next_epoch_itr(
+    itr = epoch_itr.next_epoch_itr(  # curriculum = 0
         fix_batches_to_gpus=args.fix_batches_to_gpus,
         shuffle=((epoch_itr.epoch >= args.curriculum) and (not args.keep_order)),
     )
@@ -207,10 +233,10 @@ def train(args, trainer, task, epoch_itr):
     # task specific setup per epoch
     task.begin_epoch(epoch_itr.epoch, trainer.get_model())
 
-    valid_subsets = args.valid_subset.split(',')
+    valid_subsets = args.valid_subset.split(',')  # ['valid']
     max_update = args.max_update or math.inf
     for _, samples in enumerate(progress):
-        log_output = trainer.train_step(samples)
+        log_output = trainer.train_step(samples)            # THE STEP
         num_updates = trainer.get_num_updates()
         if log_output is None:
             continue
@@ -257,10 +283,10 @@ def validate(args, trainer, task, epoch_itr, subsets):
         utils.set_torch_seed(args.fixed_validation_seed)
 
     valid_losses = []
-    for subset in subsets:
+    for subset in subsets:  # ['valid']
         # Initialize data iterator
         itr = task.get_batch_iterator(
-            dataset=task.dataset(subset),
+            dataset=task.dataset(subset),  # MonolingualDataset
             max_tokens=args.max_tokens_valid,
             max_sentences=args.max_sentences_valid,
             max_positions=utils.resolve_max_positions(
@@ -351,6 +377,7 @@ def cli_main(modify_parser=None):
         )
     else:
         # single GPU training
+        print('single GPU training')
         main(args)
 
 

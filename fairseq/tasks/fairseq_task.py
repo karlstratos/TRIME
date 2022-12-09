@@ -314,7 +314,7 @@ class FairseqTask(object):
                 - logging outputs to display while training
         """
         model.train()
-        loss, sample_size, logging_output = criterion(model, sample)
+        loss, sample_size, logging_output = criterion(model, sample)  # Just ran trime_loss
         if ignore_grad:
             loss *= 0
         optimizer.backward(loss)

@@ -76,6 +76,14 @@ class TokenBlockDataset(FairseqDataset):
             block_size = 0
 
         slice_indices = _get_slice_indices_fast(sizes, break_mode, block_size, document_sep_len)
+        #[[     0    150]
+        #[   150    300]
+        #[   300    450]
+        #...
+        #[217200 217350]
+        #[217350 217500]
+        #[217500 217646]]
+
         self._sizes = slice_indices[:, 1] - slice_indices[:, 0]
 
         # build index mapping block indices to the underlying dataset indices
@@ -96,6 +104,13 @@ class TokenBlockDataset(FairseqDataset):
                 sizes,
                 slice_indices,
             )
+            #[[   0    0    4]
+            # [   5    0    8]
+            # [   8   16   10]
+            # ...
+            # [3739  390 3743]
+            # [3743  128 3747]
+            # [3747  136 3759]]
         self._slice_indices = plasma_utils.PlasmaArray(slice_indices)
         self._sizes = plasma_utils.PlasmaArray(self._sizes)
         self._block_to_dataset_index = plasma_utils.PlasmaArray(block_to_dataset_index)
@@ -128,7 +143,7 @@ class TokenBlockDataset(FairseqDataset):
         s, e = start_offset, start_offset + length
         item = buffer[s:e]
 
-        if self.include_targets:
+        if self.include_targets:  # This
             # *target* is the original sentence (=item)
             # *source* is shifted right by 1 (maybe left-padded with eos)
             # *past_target* is shifted right by 2 (left-padded as needed)
@@ -144,7 +159,7 @@ class TokenBlockDataset(FairseqDataset):
                 else:
                     past_target = buffer[s - 2 : e - 2]
 
-            return source, item, past_target
+            return source, item, past_target  # This is what's returned
 
         return item
 

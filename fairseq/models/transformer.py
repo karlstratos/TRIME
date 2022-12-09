@@ -599,14 +599,16 @@ class TransformerDecoder(FairseqIncrementalDecoder):
 
         self.embed_positions = (
             PositionalEmbedding(
-                args.max_target_positions,
+                args.max_target_positions,  # 150 in the 150 model
                 embed_dim,
                 self.padding_idx,
-                learned=args.decoder_learned_pos,
+                learned=args.decoder_learned_pos,  # False
             )
             if not args.no_token_positional_embeddings
             else None
         )
+        # Because padding index is 1, the whole 150 positional embeddings are shifted to the right of [0, 1], thus 152
+        #print(self.embed_positions.weights.size())  # (152, 410)
 
         self.cross_self_attention = getattr(args, "cross_self_attention", False)
         self.layer_wise_attention = getattr(args, "layer_wise_attention", False)
@@ -618,25 +620,35 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 for _ in range(args.decoder_layers)
             ]
         )
+        # print(self.layers)
+        # [... (15): TransformerDecoderLayer(
+        #      (self_attn): MultiheadAttention((k_proj): Linear(in_features=410, out_features=410, bias=True)
+        #                                      (v_proj): Linear(in_features=410, out_features=410, bias=True)
+        #                                      (q_proj): Linear(in_features=410, out_features=410, bias=True)
+        #                                      (out_proj): Linear(in_features=410, out_features=410, bias=True))
+        #      (self_attn_layer_norm): LayerNorm((410,), eps=1e-05, elementwise_affine=True)
+        #      (fc1): Linear(in_features=410, out_features=2100, bias=True)
+        #      (fc2): Linear(in_features=2100, out_features=410, bias=True)
+        #      (final_layer_norm): LayerNorm((410,), eps=1e-05, elementwise_affine=True)) ...]
         self.num_layers = len(self.layers)
 
         self.adaptive_softmax = None
 
-        self.project_out_dim = (
+        self.project_out_dim = (  # None
             Linear(embed_dim, self.output_embed_dim, bias=False)
             if (embed_dim != self.output_embed_dim and not args.tie_adaptive_weights) or (args.knn_keytype == 'separated_head')
             else None
         )
 
-        if args.adaptive_softmax_cutoff is not None:
+        if args.adaptive_softmax_cutoff is not None:  # "2000,6000"
             self.adaptive_softmax = AdaptiveSoftmax(
-                len(dictionary),
-                self.output_embed_dim,
-                options.eval_str_list(args.adaptive_softmax_cutoff, type=int),
-                dropout=args.adaptive_softmax_dropout,
-                adaptive_inputs=embed_tokens if args.tie_adaptive_weights else None,
-                factor=args.adaptive_softmax_factor,
-                tie_proj=args.tie_adaptive_proj,
+                len(dictionary),  # 33280
+                self.output_embed_dim,  # 410
+                options.eval_str_list(args.adaptive_softmax_cutoff, type=int),  # [2000, 6000]
+                dropout=args.adaptive_softmax_dropout,  # 0
+                adaptive_inputs=embed_tokens if args.tie_adaptive_weights else None,  # AdaptiveInput module
+                factor=args.adaptive_softmax_factor,  # 1.0
+                tie_proj=args.tie_adaptive_proj,  # False
             )
         elif not self.share_input_output_embed:
             self.embed_out = nn.Parameter(
@@ -644,23 +656,22 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             )
             nn.init.normal_(self.embed_out, mean=0, std=self.output_embed_dim ** -0.5)
 
-        if args.decoder_normalize_before and not getattr(
+        if args.decoder_normalize_before and not getattr(  # This
             args, "no_decoder_final_norm", False
         ):
-            self.layer_norm = LayerNorm(embed_dim)
+            self.layer_norm = LayerNorm(embed_dim)  # (410,)
         else:
             self.layer_norm = None
         if getattr(args, "layernorm_embedding", False):
             self.layernorm_embedding = LayerNorm(embed_dim)
-        else:
+        else:  # This
             self.layernorm_embedding = None
-
         if args.knn_keytype == 'separated_head':
             self.knn_head = nn.Sequential(
                 Linear(embed_dim, self.output_embed_dim, bias=False),
                 LayerNorm(self.output_embed_dim),
             )
-        else:
+        else:  # This
             self.knn_head = None
 
     def forward(
@@ -699,6 +710,13 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         )
         if not features_only:
             x = self.output_layer(x)
+
+        # x: (60, 150, 410)  == (bsz, len, dim)
+        # extra:
+        #      extra['attn']: [None]
+        #      extra['inner_states']: [17 tensors of size (150, 60, 410)]
+        #      extra['last_ffn_input']: (150, 60, 410)
+        #      extra['model_output']: (150, 60, 410)
         return x, extra
 
     def extract_features(
@@ -829,10 +847,10 @@ class TransformerDecoder(FairseqIncrementalDecoder):
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)
-        
+
         if self.knn_head is not None:
             knn_head_out = self.knn_head(x)
-        
+
         if self.knn_keytype == 'separated_head':
             knn_emb = knn_head_out
             knn_embs['separated_head'] = knn_head_out

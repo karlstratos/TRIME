@@ -20,6 +20,26 @@ if [ "${dataset}" = "wikitext-103" ]; then
         --destdir data-bin/wikitext-103 \
         --workers 20
 
+elif [ "${dataset}" = "wikitext-2" ]; then
+    echo Download and process wikitext-2
+
+    mkdir -p data-bin/wikitext-2
+    cd data-bin/wikitext-2
+
+    mkdir raw_data
+    cd raw_data
+    wget https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-v1.zip
+    unzip wikitext-2-v1.zip
+
+    cd ../../..
+    python preprocess.py \
+        --only-source \
+        --trainpref data-bin/wikitext-2/raw_data/wikitext-2/wiki.train.tokens \
+        --validpref data-bin/wikitext-2/raw_data/wikitext-2/wiki.valid.tokens \
+        --testpref data-bin/wikitext-2/raw_data/wikitext-2/wiki.test.tokens \
+        --destdir data-bin/wikitext-2 \
+        --workers 20
+
 elif [ "${dataset}" = "enwik8" ]; then
     echo Download and process enwik8
 

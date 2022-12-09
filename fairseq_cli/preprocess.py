@@ -1,3 +1,6 @@
+# For analysis:
+# python preprocess.py --only-source --trainpref data-bin/wikitext-2/raw_data/wikitext-2/wiki.train.tokens --validpref data-bin/wikitext-2/raw_data/wikitext-2/wiki.valid.tokens --testpref data-bin/wikitext-2/raw_data/wikitext-2/wiki.test.tokens --destdir data-bin/wikitext-2 --workers 1
+
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates.
 #
@@ -56,8 +59,17 @@ def main(args):
     def dict_path(lang):
         return dest_path("dict", lang) + ".txt"
 
+    # Calling: "build_dictionary([train_path(args.source_lang)], src=True)"
     def build_dictionary(filenames, src=False, tgt=False):
         assert src ^ tgt
+        #print(filenames)  # ['data-bin/wikitext-2/raw_data/wikitext-2/wiki.train.tokens']
+        #print(args.workers)  # 20
+        #print(args.thresholdsrc)  # 0
+        #print(args.thresholdtgt)  # 0
+        #print(args.nwordssrc)  # -1
+        #print(args.nwordstgt)  # -1
+        #print(args.padding_factor) # 8: Pad Dictionary size to be a multiple of 8
+
         return task.build_dictionary(
             filenames,
             workers=args.workers,
@@ -66,10 +78,11 @@ def main(args):
             padding_factor=args.padding_factor,
         )
 
-    target = not args.only_source
+    target = not args.only_source  # False
 
-    if not args.srcdict and os.path.exists(dict_path(args.source_lang)):
-        raise FileExistsError(dict_path(args.source_lang))
+    # Just overwrite "dict.txt" (args.source_lang="")
+    #if not args.srcdict and os.path.exists(dict_path(args.source_lang)):
+    #    raise FileExistsError(dict_path(args.source_lang))
     if target and not args.tgtdict and os.path.exists(dict_path(args.target_lang)):
         raise FileExistsError(dict_path(args.target_lang))
 
@@ -87,12 +100,14 @@ def main(args):
                 {train_path(lang) for lang in [args.source_lang, args.target_lang]}, src=True
             )
         tgt_dict = src_dict
-    else:
+    else:  # This
         if args.srcdict:
             src_dict = task.load_dictionary(args.srcdict)
         else:
             assert args.trainpref, "--trainpref must be set if --srcdict is not specified"
-            src_dict = build_dictionary([train_path(args.source_lang)], src=True)
+            src_dict = build_dictionary([train_path(args.source_lang)], src=True)  # https://fairseq.readthedocs.io/en/latest/_modules/fairseq/data/dictionary.html
+            # For wikitext (not raw, so it has <unk> already), the dict size is 3 more with <s>, <pad>, </s> (<unk> already there)
+            #print(len(src_dict.indices))
 
         if target:
             if args.tgtdict:
@@ -108,6 +123,9 @@ def main(args):
         tgt_dict.save(dict_path(args.target_lang))
 
     def make_binary_dataset(vocab, input_prefix, output_prefix, lang, num_workers):
+        # vocab=src_dict, lang=None, 33279=33280-1 types (for wikitext-2)
+        # print(input_prefix)  # data-bin/wikitext-2/raw_data/wikitext-2/wiki.train.tokens
+        # print(output_prefix)  # train
         logger.info("[{}] Dictionary: {} types".format(lang, len(vocab) - 1))
         n_seq_tok = [0, 0]
         replaced = Counter()
@@ -121,11 +139,14 @@ def main(args):
             input_prefix, ("." + lang) if lang is not None else ""
         )
         offsets = Binarizer.find_offsets(input_file, num_workers)
+        # num_workers=1: offsets=[0, 0]
+        # num_workers=2: offsets=[0, 5398971, 0]
+        # num_workers=3: offsets=[0, 3600108, 7198369, 0]
         pool = None
         if num_workers > 1:
             pool = Pool(processes=num_workers - 1)
             for worker_id in range(1, num_workers):
-                prefix = "{}{}".format(output_prefix, worker_id)
+                prefix = "{}{}".format(output_prefix, worker_id)  # This will add ID to prefix
                 pool.apply_async(
                     binarize,
                     (
@@ -141,24 +162,29 @@ def main(args):
                 )
             pool.close()
 
+        # make_builder("data-bin/wikitext-2/train.bin", "mmap", 33280)
+        # will call
+        # MMapIndexedDatasetBuilder("data-bin/wikitext-2/train.bin", dtype=best_fitting_int_dtype(33280))
         ds = indexed_dataset.make_builder(dataset_dest_file(args, output_prefix, lang, "bin"),
                                           impl=args.dataset_impl, vocab_size=len(vocab))
+        # print(input_file)  # data-bin/wikitext-2/raw_data/wikitext-2/wiki.train.tokens
+        # print(offsets)  # [0, 0]
         merge_result(
             Binarizer.binarize(
-                input_file, vocab, lambda t: ds.add_item(t),
+                input_file, vocab, lambda t: ds.add_item(t),  # ds will write to the binary file train.bin (add_item)
                 offset=0, end=offsets[1]
             )
         )
         if num_workers > 1:
             pool.join()
             for worker_id in range(1, num_workers):
-                prefix = "{}{}".format(output_prefix, worker_id)
+                prefix = "{}{}".format(output_prefix, worker_id)  # Add ID to prefix
                 temp_file_path = dataset_dest_prefix(args, prefix, lang)
                 ds.merge_file_(temp_file_path)
                 os.remove(indexed_dataset.data_file_path(temp_file_path))
                 os.remove(indexed_dataset.index_file_path(temp_file_path))
 
-        ds.finalize(dataset_dest_file(args, output_prefix, lang, "idx"))
+        ds.finalize(dataset_dest_file(args, output_prefix, lang, "idx"))  # closes train.bin and also writes sent legnths to train.idx like [83, 1, 6, 1, 146, 272, 269, 21, 1...]
 
         logger.info(
             "[{}] {}: {} sents, {} tokens, {:.3}% replaced by {}".format(
@@ -233,17 +259,22 @@ def main(args):
                 lang,
             )
             shutil.copyfile(file_name(input_prefix, lang), output_text_file)
-        else:
+        else:  # This: args.dataset_impl == "mmap"
             make_binary_dataset(vocab, input_prefix, output_prefix, lang, num_workers)
 
     def make_all(lang, vocab):
+        print("make_all")
         if args.trainpref:
+            print("train")
+            #                     ./input_prefix   ./output_prefix
             make_dataset(vocab, args.trainpref, "train", lang, num_workers=args.workers)
         if args.validpref:
+            print("valid")
             for k, validpref in enumerate(args.validpref.split(",")):
                 outprefix = "valid{}".format(k) if k > 0 else "valid"
                 make_dataset(vocab, validpref, outprefix, lang, num_workers=args.workers)
         if args.testpref:
+            print("test")
             for k, testpref in enumerate(args.testpref.split(",")):
                 outprefix = "test{}".format(k) if k > 0 else "test"
                 make_dataset(vocab, testpref, outprefix, lang, num_workers=args.workers)
@@ -257,9 +288,9 @@ def main(args):
             make_binary_alignment_dataset(args.testpref + "." + args.align_suffix, "test.align", num_workers=args.workers)
 
     make_all(args.source_lang, src_dict)
-    if target:
+    if target:  # False
         make_all(args.target_lang, tgt_dict)
-    if args.align_suffix:
+    if args.align_suffix:  # None
         make_all_alignments()
 
     logger.info("Wrote preprocessed data to {}".format(args.destdir))

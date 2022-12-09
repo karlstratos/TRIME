@@ -405,6 +405,14 @@ class FairseqLanguageModel(BaseFairseqModel):
                 - the decoder's output of shape `(batch, seq_len, vocab)`
                 - a dictionary with any model-specific outputs
         """
+        # TransformerDecoder returns (x, extra) where
+        #
+        # x: (60, 150, 410)  == (bsz, len, dim)
+        # extra:
+        #      extra['attn']: [None]
+        #      extra['inner_states']: [17 tensors of size (150, 60, 410)]
+        #      extra['last_ffn_input']: (150, 60, 410)
+        #      extra['model_output']: (150, 60, 410)
         return self.decoder(src_tokens, **kwargs)
 
     def forward_decoder(self, prev_output_tokens, **kwargs):
