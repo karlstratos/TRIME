@@ -108,6 +108,7 @@ def main(args):
             src_dict = build_dictionary([train_path(args.source_lang)], src=True)  # https://fairseq.readthedocs.io/en/latest/_modules/fairseq/data/dictionary.html
             # For wikitext (not raw, so it has <unk> already), the dict size is 3 more with <s>, <pad>, </s> (<unk> already there)
             #print(len(src_dict.indices))
+            #print(src_dict.symbols)
 
         if target:
             if args.tgtdict:

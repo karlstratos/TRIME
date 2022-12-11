@@ -186,7 +186,7 @@ class EpochBatchIterator(EpochBatchIterating):
         self._cur_epoch_itr = None
         self._next_epoch_itr = None
         self._supports_prefetch = getattr(dataset, 'supports_prefetch', False)
-        
+
         self.predefined_batches = predefined_batches
         self.keep_order = keep_order
         self.num_comb_shards = num_comb_shards
@@ -249,7 +249,10 @@ class EpochBatchIterator(EpochBatchIterating):
                 offset=itr_pos,
             )
 
+    #                                   v1     vTrue inside train(...)
     def _get_iterator_for_epoch(self, epoch, shuffle, fix_batches_to_gpus=False, offset=0):
+
+        #print('inside _get_iterator_for_epoch, epoch', epoch, 'shuffle', shuffle)
 
         def shuffle_batches(batches, seed):
             if not self.predefined_batches:
@@ -265,7 +268,7 @@ class EpochBatchIterator(EpochBatchIterating):
                 batches = [item for g in grouped_batches for item in g]
             return batches
 
-        if self._supports_prefetch:
+        if self._supports_prefetch:  # False
             batches = self.frozen_batches
 
             if shuffle and not fix_batches_to_gpus:
@@ -285,10 +288,14 @@ class EpochBatchIterator(EpochBatchIterating):
                 batches = shuffle_batches(batches, self.seed + epoch + self.shard_id)
         else:
             if shuffle:
+                print('calling shuffle_batches inside iterators.py: EpochBatchIterator._get_iterator_for_epoch')
+                print(list(self.frozen_batches))
+                # [[17, 10, 8, 3], [1, 7, 0, 5], [14, 13, 9, 16], [15, 2, 4, 6], [12, 11]]
                 batches = shuffle_batches(list(self.frozen_batches), self.seed + epoch)
+                # [[14, 13, 9, 16], [12, 11], [1, 7, 0, 5], [15, 2, 4, 6], [17, 10, 8, 3]]
             else:
                 batches = self.frozen_batches
-            
+
             if not self.keep_order:
                 batches = list(ShardedIterator(
                     batches, self.num_shards, self.shard_id, fill_value=[]
@@ -407,7 +414,7 @@ class SequentialShardedIterator(object):
 
         self.itr = itertools.zip_longest(
             range(self._sharded_len),
-            itertools.islice(iterable, (shard_id // num_comb_shards) * self._sharded_len_combined + (shard_id % num_comb_shards), 
+            itertools.islice(iterable, (shard_id // num_comb_shards) * self._sharded_len_combined + (shard_id % num_comb_shards),
                                        min(len(iterable), (shard_id // num_comb_shards + 1) * self._sharded_len_combined), num_comb_shards),
             fillvalue=fill_value,
         )

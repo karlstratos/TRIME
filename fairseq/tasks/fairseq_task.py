@@ -153,9 +153,10 @@ class FairseqTask(object):
 
         # get indices ordered by example size
         with data_utils.numpy_seed(seed):
-            indices = dataset.ordered_indices()
+            indices = dataset.ordered_indices()  # [17 10  8  3  1  7  0  5 14 13  9 16 15  2  4  6 12 11] for toy
+            print(indices)
 
-        if hasattr(self.args, 'keep_order') and self.args.keep_order:
+        if hasattr(self.args, 'keep_order') and self.args.keep_order:  # Not
             indices = dataset.keep_order_indices()
 
         # filter examples that are too large
@@ -164,17 +165,21 @@ class FairseqTask(object):
                 indices, dataset, max_positions, raise_exception=(not ignore_invalid_inputs),
             )
 
-        if hasattr(dataset, 'shuffle') and dataset.shuffle and self.args.predefined_batches is not None:
+        if hasattr(dataset, 'shuffle') and dataset.shuffle and self.args.predefined_batches is not None:  # No predefined batches
             indices_ = dataset.predefined_indices(self.args.predefined_batches)
             # check if it is training (instead of valid)
             if len(indices) == len(indices_):
                 indices = indices_
 
         # create mini-batches with given size constraints
-        batch_sampler = data_utils.batch_by_size(
+        print('calling batch_by_size inside fairseq_task.py')
+        batch_sampler = data_utils.batch_by_size(  # [[17, 10, 8, 3], [1, 7, 0, 5], [14, 13, 9, 16], [15, 2, 4, 6], [12, 11]]
             indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
             required_batch_size_multiple=required_batch_size_multiple,
         )
+        print('done batch_by_size')
+        #print('batch_sampler')
+        #print(batch_sampler)
 
         # return a reusable, sharded iterator
         epoch_iter = iterators.EpochBatchIterator(

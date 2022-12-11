@@ -101,8 +101,11 @@ def main(args, init_distributed=False):
 
     # Load the latest checkpoint if one is available and restore the
     # corresponding train iterator
+    print('calling load_checkpoint')
     extra_state, epoch_itr = checkpoint_utils.load_checkpoint(args, trainer)
-    # epoch_itr:  EpochBatchIterator over TokenBlockDataset(train)
+    print('done load_checkpoint')
+    # epoch_itr:  EpochBatchIterator
+    #print(epoch_itr.dataset.dataset.dataset)  # MonolingualDataset.TokenBlockDataset.MMapIndexedDataset
 
     if args.output_segments_to_file is not None:
         segments = []
@@ -212,10 +215,13 @@ def should_stop_early(args, valid_loss):
 def train(args, trainer, task, epoch_itr):
     """Train the model for one epoch."""
     # Initialize data iterator
+    print('calling next_epoch_itr in train(..)')
     itr = epoch_itr.next_epoch_itr(  # curriculum = 0
         fix_batches_to_gpus=args.fix_batches_to_gpus,
         shuffle=((epoch_itr.epoch >= args.curriculum) and (not args.keep_order)),
     )
+    print('done next_epoch_itr in train(..)')
+
     update_freq = (
         args.update_freq[epoch_itr.epoch - 1]
         if epoch_itr.epoch <= len(args.update_freq)
@@ -235,7 +241,41 @@ def train(args, trainer, task, epoch_itr):
 
     valid_subsets = args.valid_subset.split(',')  # ['valid']
     max_update = args.max_update or math.inf
-    for _, samples in enumerate(progress):
+
+
+    def verbalize_samples(samples):
+        print('-' * 80)
+        print(f'len(samples)={len(samples)}')
+        print(f'samples[0].keys()={samples[0].keys()}')
+        print(f'samples[0][id]={samples[0]["id"].tolist()}')
+        print(f'samples[0][ntokens]={samples[0]["ntokens"]}')
+        print(f'samples[0][net_input][src_lengths]=',samples[0]['net_input']['src_lengths'])
+        print(f'samples[0][net_input][src_tokens]')
+
+        #print(task.dictionary.string(samples[0]['net_input']['src_tokens']))   # Not relying on this just in case
+        [B, T] = list(samples[0]['net_input']['src_tokens'].size())
+        for i in range(B):
+            for t in range(T):
+                s = task.dictionary[samples[0]['net_input']['src_tokens'][i, t].item()]
+                print(s, end=' ')
+            print()
+
+        print()
+        print(f'samples[0][target]')
+        #print(task.dictionary.string(samples[0]['target']))
+        [B, T] = list(samples[0]['target'].size())
+        for i in range(B):
+            for t in range(T):
+                s = task.dictionary[samples[0]['target'][i, t].item()]
+                print(s, end=' ')
+            print()
+
+
+    #print([x[0]['id'].tolist() for x in list(progress)])
+    for idx_progress, samples in enumerate(progress):
+        print(idx_progress + 1, '/', len(progress))
+        verbalize_samples(samples)
+
         log_output = trainer.train_step(samples)            # THE STEP
         num_updates = trainer.get_num_updates()
         if log_output is None:

@@ -37,7 +37,7 @@ def build_progress_bar(args, iterator, epoch=None, prefix=None, default='tqdm', 
         bar = noop_progress_bar(iterator, epoch, prefix)
     elif args.log_format == 'simple':
         bar = simple_progress_bar(iterator, epoch, prefix, args.log_interval)
-    elif args.log_format == 'tqdm':
+    elif args.log_format == 'tqdm':  # This is default for training, unless changed to simple by CLI
         bar = tqdm_progress_bar(iterator, epoch, prefix)
     else:
         raise ValueError('Unknown log format: {}'.format(args.log_format))

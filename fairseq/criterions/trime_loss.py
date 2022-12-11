@@ -213,21 +213,6 @@ class TrimeLoss(FairseqCriterion):
         ctx_loss = -torch.logsumexp(in_batch_logs + negatives * -10000.0, dim=-1)  # negatives only used for ctx_loss, not norm_c
 
 
-
-        tmp = in_batch_logs + negatives * -10000.0
-        print(in_batch_logs.exp())
-        print(in_batch_logs.size())
-        print()
-        print(negatives.sum(-1))
-        print(negatives * -10000)
-        print()
-        print(tmp)
-        print(tmp.size())
-        print()
-        print(ctx_loss)
-        print(ctx_loss.size())
-        exit()
-
         # normalize token loss and ctx loss
         norm_tpc = torch.logsumexp(torch.stack((norm_t, norm_c), dim=-1), dim=-1)
         norm_loss = -torch.logsumexp(torch.stack((-token_loss + norm_t - norm_tpc, -ctx_loss + norm_c - norm_tpc), dim=-1), dim=-1)
