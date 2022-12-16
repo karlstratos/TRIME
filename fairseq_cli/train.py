@@ -251,7 +251,6 @@ def train(args, trainer, task, epoch_itr):
         print(f'samples[0][ntokens]={samples[0]["ntokens"]}')
         print(f'samples[0][net_input][src_lengths]=',samples[0]['net_input']['src_lengths'])
         print(f'samples[0][net_input][src_tokens]')
-
         #print(task.dictionary.string(samples[0]['net_input']['src_tokens']))   # Not relying on this just in case
         [B, T] = list(samples[0]['net_input']['src_tokens'].size())
         for i in range(B):
@@ -259,6 +258,7 @@ def train(args, trainer, task, epoch_itr):
                 s = task.dictionary[samples[0]['net_input']['src_tokens'][i, t].item()]
                 print(s, end=' ')
             print()
+        print(samples[0]['net_input']['src_tokens'])
 
         print()
         print(f'samples[0][target]')
@@ -269,6 +269,8 @@ def train(args, trainer, task, epoch_itr):
                 s = task.dictionary[samples[0]['target'][i, t].item()]
                 print(s, end=' ')
             print()
+        print(samples[0]['target'])
+
 
 
     #print([x[0]['id'].tolist() for x in list(progress)])

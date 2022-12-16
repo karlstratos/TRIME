@@ -117,7 +117,7 @@ class Trainer(object):
             )
         )
 
-        if self.args.fp16:
+        if self.args.fp16:  # True!
             if self.cuda and torch.cuda.get_device_capability(0)[0] < 7:
                 logger.info(
                     "NOTE: your device does NOT support faster training with --fp16, "
@@ -127,7 +127,7 @@ class Trainer(object):
                 self._optimizer = optim.MemoryEfficientFP16Optimizer.build_optimizer(
                     self.args, params
                 )
-            else:
+            else:  # This
                 self._optimizer = optim.FP16Optimizer.build_optimizer(self.args, params)
         else:
             if self.cuda and torch.cuda.get_device_capability(0)[0] >= 7:

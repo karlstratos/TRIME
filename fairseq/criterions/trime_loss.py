@@ -174,7 +174,15 @@ class TrimeLoss(FairseqCriterion):
                 #                                     i=1:     (1023, 27280)    (1023)
                 token_loss[target_idxs[i]] += F.cross_entropy(logits[i + 1], target[i + 1], ignore_index=self.padding_idx, reduction='none')
 
-        ori_loss = token_loss.sum(-1).view(-1)
+        print(token_loss.size())
+        print(token_loss.sum(-1).size())
+        print(token_loss.sum(-1).view(-1).size())
+        print(token_loss.sum(-1).view(-1))
+
+        # token_loss: (num_targets,)
+        # token_loss.sum(-1): scalar
+        # token_loss.sum(-1).view(-1): (1,)
+        ori_loss = token_loss.sum(-1).view(-1)  # Not dividing by num words?
 
         # While epoch <= 3 ("--ce-warmup-epoch 3"), return_ce_loss is True
         if self.return_ce_loss:

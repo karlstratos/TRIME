@@ -37,7 +37,7 @@ class FairseqAdam(FairseqOptimizer):
         if use_fused_adam:
             logger.info('using FusedAdam')
             self._optimizer = fused_adam_cls(params, **self.optimizer_config)
-        else:
+        else:  # This
             self._optimizer = Adam(params, **self.optimizer_config)
 
     @staticmethod
